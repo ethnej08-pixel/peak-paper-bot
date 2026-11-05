@@ -1,10 +1,10 @@
 # Peak Paper Bot (FAKE money, real prices)
 
-_Last check: 2026-11-05 10:21 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
+_Last check: 2026-11-05 10:52 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
 
 | Account value | Bot return | If you'd just held SPY | Cash |
 |---|---|---|---|
-| **$9,956.58** | **-0.43%** | -2.53% | $9,956.58 |
+| **$9,956.58** | **-0.43%** | -3.85% | $9,956.58 |
 
 ## Open positions
 
