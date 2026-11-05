@@ -1,21 +1,22 @@
 # Peak Paper Bot (FAKE money, real prices)
 
-_Last check: 2026-11-05 12:54 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
+_Last check: 2026-11-05 13:45 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
 
 | Account value | Bot return | If you'd just held SPY | Cash |
 |---|---|---|---|
-| **$9,890.53** | **-1.09%** | -3.90% | $8,498.54 |
+| **$9,881.53** | **-1.18%** | -4.14% | $9,881.53 |
 
 ## Open positions
 
 | Stock | Shares | Bought at | Now | P/L |
 |---|---|---|---|---|
-| AMZN | 5.337 | $262.32 | $260.82 | $-7.99 |
+| none | | | | |
 
 ## Trades (newest first)
 
 | Time | Side | Stock | Price | P/L | Why |
 |---|---|---|---|---|---|
+| 11-05 13:45 | SELL | AMZN | $259.14 | $-16.99 | trend down: 9-bar avg 259.36 < 21-bar avg 260.44 |
 | 11-05 12:54 | SELL | TSLA | $341.65 | $-13.66 | trend down: 9-bar avg 341.99 < 21-bar avg 344.80 |
 | 11-05 12:54 | SELL | MSFT | $540.23 | $-5.94 | trend down: 9-bar avg 540.74 < 21-bar avg 541.80 |
 | 11-05 12:54 | SELL | NVDA | $182.72 | $-27.46 | trend down: 9-bar avg 183.89 < 21-bar avg 185.16 |
