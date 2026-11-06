@@ -1,25 +1,29 @@
 # Peak Paper Bot (FAKE money, real prices)
 
-_Last check: 2026-11-06 10:09 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
+_Last check: 2026-11-06 10:43 ET. Runs every 5 min, 9:30-4:00 ET weekdays._
 
 | Account value | Bot return | If you'd just held SPY | Cash |
 |---|---|---|---|
-| **$10,031.66** | **+0.32%** | -3.76% | $2,870.49 |
+| **$10,010.14** | **+0.10%** | -3.84% | $70.52 |
 
 ## Open positions
 
 | Stock | Shares | Bought at | Now | P/L |
 |---|---|---|---|---|
-| QQQ | 2.143 | $653.16 | $659.33 | $+13.22 |
-| NVDA | 7.645 | $183.14 | $191.84 | $+66.56 |
-| TSLA | 4.090 | $342.25 | $356.61 | $+58.73 |
-| SPY | 1.904 | $735.42 | $738.92 | $+6.66 |
-| AMZN | 5.399 | $259.31 | $262.27 | $+16.00 |
+| QQQ | 2.143 | $653.16 | $657.66 | $+9.64 |
+| NVDA | 7.645 | $183.14 | $188.78 | $+43.17 |
+| TSLA | 4.090 | $342.25 | $357.20 | $+61.14 |
+| SPY | 1.904 | $735.42 | $738.34 | $+5.55 |
+| AMZN | 5.399 | $259.31 | $263.14 | $+20.70 |
+| AAPL | 4.070 | $343.94 | $343.88 | $-0.28 |
+| MSFT | 2.617 | $534.90 | $534.79 | $-0.28 |
 
 ## Trades (newest first)
 
 | Time | Side | Stock | Price | P/L | Why |
 |---|---|---|---|---|---|
+| 11-06 10:43 | BUY | MSFT | $534.90 |  | uptrend: 9-bar avg 533.49 > 21-bar avg 532.82 |
+| 11-06 10:43 | BUY | AAPL | $343.94 |  | uptrend: 9-bar avg 343.31 > 21-bar avg 343.12 |
 | 11-06 10:09 | SELL | AAPL | $341.28 | $-11.04 | trend down: 9-bar avg 341.29 < 21-bar avg 343.64 |
 | 11-05 15:28 | BUY | AMZN | $259.31 |  | uptrend: 9-bar avg 259.75 > 21-bar avg 259.74 |
 | 11-05 15:28 | BUY | SPY | $735.42 |  | uptrend: 9-bar avg 736.94 > 21-bar avg 736.86 |
