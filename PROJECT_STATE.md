@@ -5,16 +5,16 @@
 ## Project
 
 - **Project name:** Peak / AI workflow (paper-trading bot, fake money only)
-- **Last updated:** 2026-11-07 ET
+- **Last updated:** 2026-11-06 20:25 ET (Fri night)
 - **Updated by:** Claude Code
 - **Shared source of truth:** https://github.com/ethnej08-pixel/peak-paper-bot
 
 ## Current status
 
-- **Overall:** In progress — bot is live on GitHub Actions and trading fake money.
+- **Overall:** Live — repo is public, PR #1 merged, all-day 5-min loop starts Mon 2026-11-09.
 - **Current goal:** Run the 9/21-bar trend strategy on 7 symbols and compare against holding SPY.
-- **Next action:** Merge branch `claude/elegant-wright-vtc4sp` into `main` and make the repo public, so the new all-day 5-minute loop starts.
-- **Blockers / decisions needed:** GitHub's cron only fired about hourly. Fix (on the branch): one long job per trading day ticks every 5 min itself (`bot.py --loop`). Needs a public repo for free unlimited Actions minutes; owner chose public on 2026-11-07.
+- **Next action:** Mon 2026-11-09 10:30 ET: Claude Code checks the first live day (tick commits every 5 min from 9:30, `RESULTS.md` updating, SPY start check result in `state.json` log).
+- **Blockers / decisions needed:** None. Note: repo is now public, so never commit passwords/keys (dashboard password comes from env vars only; see `SECURITY.md`).
 
 ## Tasks
 
@@ -23,16 +23,29 @@
 | Done | Paper-trading bot (`bot.py`) | Claude | commit `44c63bb` | 2026-11-05 |
 | Done | Scheduled GitHub Actions run (`.github/workflows/trade.yml`) | Claude | `tick HH:MM` commits on 2026-11-05 and 2026-11-06 | 2026-11-06 |
 | Done | Shared project state template | ethnej08-pixel | commit `25e21b7` | 2026-11-06 |
-| Done | True 5-min schedule via all-day loop job | Claude Code | `bot.py --loop`, `.github/workflows/trade.yml` on branch `claude/elegant-wright-vtc4sp` | 2026-11-07 |
-| Done | Review fixes: 0.1% trend gap, less-correlated symbols, SPY start check + "too early" note, holidays | Claude Code | PR #1 | 2026-11-07 |
-| Todo | Make repo public + merge branch to `main` | ethnej08-pixel |  |  |
+| Done | True 5-min schedule via all-day loop job | Claude Code | `bot.py --loop`, `.github/workflows/trade.yml` merged in PR #1 (`9758ba3`) | 2026-11-06 |
+| Done | Review fixes: 0.1% trend gap, less-correlated symbols, SPY start check + "too early" note, holidays | Claude Code | merged in PR #1 (`9758ba3`) | 2026-11-06 |
+| Done | Dashboard password (HTTP Basic auth, env vars) + unit tests | ethnej08-pixel | commit `59d9419`, `SECURITY.md`, `tests/`; 6 tests pass | 2026-11-06 |
+| Done | Merge PR #1 to `main` | Claude Code | https://github.com/ethnej08-pixel/peak-paper-bot/pull/1 | 2026-11-06 |
+| Done | Make repo public (free unlimited Actions minutes) | ethnej08-pixel | GitHub API: `"visibility": "public"` | 2026-11-06 |
+| Done | Price-only test run on GitHub | Claude Code | run 42323273773: all 7 symbols fetched, 391 bars each | 2026-11-06 |
+| Done | Daily results panel (right side of dashboard) + "Daily results" table in `RESULTS.md` | Claude Code | `daily_pnl`/`daily_panel` in `bot.py`; `tests/test_daily_results.py` (9 tests pass) | 2026-11-06 |
+| Todo | Check first live 5-min day | Claude Code | scheduled Mon 2026-11-09 10:30 ET |  |
 | Todo | Add 2028 NYSE holidays to `bot.py` | ethnej08-pixel |  |  |
 
 ## Work log
 
 Add newest entries first. Keep each entry short and verifiable.
 
-### 2026-11-07 — Claude Code
+### 2026-11-06 20:25 ET — Claude Code
+
+- **Completed:** Merged PR #1. Owner made the repo public. Ran a price-only test on GitHub. Added a daily results panel: profitable vs negative days, best/worst day, a bar per day (so far: Fri Nov 6 +$120.62, Thu Nov 5 -$118.47).
+- **Files changed:** `PROJECT_STATE.md` — status, tasks, automations; `bot.py` — daily panel + RESULTS.md section; `tests/test_daily_results.py`; `RESULTS.md` regenerated.
+- **Checks run:** 9 unit tests pass; screenshot of dashboard at 1280px and 390px (no sideways scroll on phone). GitHub API shows repo `public`; Actions run 42323273773 succeeded, all 7 symbols returned 391 five-min bars; `python3 -m unittest discover -s tests` → 6 OK; scanned repo for committed passwords/tokens → none.
+- **Still working on:** Nothing until Monday.
+- **Next step:** Mon 2026-11-09 10:30 ET check of the first live 5-min day.
+
+### 2026-11-06 ~20:05 ET — Claude Code
 
 - **Completed:** Filled in this file from the repo's current state. Switched the bot to an all-day loop job so it really runs every 5 min. Fixed the other 3 review findings (see Review notes).
 - **Files changed:** `PROJECT_STATE.md` — status, tasks, log; `bot.py` — `--loop` mode + `git_save`; `.github/workflows/trade.yml` — kick-off crons, 6 h job, no DST edits needed.
@@ -68,8 +81,9 @@ Add newest entries first. Keep each entry short and verifiable.
 
 | Item | Status | Evidence (file, link, run ID, or result) | Last checked |
 |---|---|---|---|
-| `paper-trade` workflow (weekdays 9:30–3:55 ET) | On `main`: about hourly. On branch: every 5 min via loop (simulated full day = 79 ticks; not yet run on GitHub) | `tick` commits in `git log`; output in `RESULTS.md` | 2026-11-07 |
-| Manual price check (`workflow_dispatch`, `bot.py --check`) | Available | `.github/workflows/trade.yml` | 2026-11-07 |
+| `paper-trade` workflow (trading days 9:30–3:55 ET) | Merged; all-day loop every 5 min. First live day Mon 2026-11-09 (simulated full day = 79 ticks) | `tick` commits in `git log`; output in `RESULTS.md` | 2026-11-07 |
+| Manual price check (`workflow_dispatch`, `bot.py --check`) | Passed | https://github.com/ethnej08-pixel/peak-paper-bot/actions/runs/42323273773 — SPY 735.29, AAPL 342.37, NVDA 186.64, TSLA 358.22, GLD 372.52, TLT 81.92, XLE 61.62 | 2026-11-06 |
+| `tests` workflow (unit tests on PRs) | Added | `.github/workflows/tests.yml`; 6 tests pass locally | 2026-11-06 |
 
 ## Review notes
 
