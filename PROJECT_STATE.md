@@ -29,6 +29,7 @@
 | Done | Merge PR #1 to `main` | Claude Code | https://github.com/ethnej08-pixel/peak-paper-bot/pull/1 | 2026-11-06 |
 | Done | Make repo public (free unlimited Actions minutes) | ethnej08-pixel | GitHub API: `"visibility": "public"` | 2026-11-06 |
 | Done | Price-only test run on GitHub | Claude Code | run 42323273773: all 7 symbols fetched, 391 bars each | 2026-11-06 |
+| Done | Daily results panel (right side of dashboard) + "Daily results" table in `RESULTS.md` | Claude Code | `daily_pnl`/`daily_panel` in `bot.py`; `tests/test_daily_results.py` (9 tests pass) | 2026-11-06 |
 | Todo | Check first live 5-min day | Claude Code | scheduled Mon 2026-11-09 10:30 ET |  |
 | Todo | Add 2028 NYSE holidays to `bot.py` | ethnej08-pixel |  |  |
 
@@ -38,9 +39,9 @@ Add newest entries first. Keep each entry short and verifiable.
 
 ### 2026-11-06 20:25 ET — Claude Code
 
-- **Completed:** Merged PR #1. Owner made the repo public. Ran a price-only test on GitHub.
-- **Files changed:** `PROJECT_STATE.md` — status, tasks, automations.
-- **Checks run:** GitHub API shows repo `public`; Actions run 42323273773 succeeded, all 7 symbols returned 391 five-min bars; `python3 -m unittest discover -s tests` → 6 OK; scanned repo for committed passwords/tokens → none.
+- **Completed:** Merged PR #1. Owner made the repo public. Ran a price-only test on GitHub. Added a daily results panel: profitable vs negative days, best/worst day, a bar per day (so far: Fri Nov 6 +$120.62, Thu Nov 5 -$118.47).
+- **Files changed:** `PROJECT_STATE.md` — status, tasks, automations; `bot.py` — daily panel + RESULTS.md section; `tests/test_daily_results.py`; `RESULTS.md` regenerated.
+- **Checks run:** 9 unit tests pass; screenshot of dashboard at 1280px and 390px (no sideways scroll on phone). GitHub API shows repo `public`; Actions run 42323273773 succeeded, all 7 symbols returned 391 five-min bars; `python3 -m unittest discover -s tests` → 6 OK; scanned repo for committed passwords/tokens → none.
 - **Still working on:** Nothing until Monday.
 - **Next step:** Mon 2026-11-09 10:30 ET check of the first live 5-min day.
 

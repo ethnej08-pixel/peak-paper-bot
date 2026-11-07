@@ -173,6 +173,50 @@ def equity(s):
     return s["cash"] + sum(p["qty"] * s["prices"].get(k, p["entry"]) for k, p in s["pos"].items())
 
 
+def money(v):
+    return f"{'+' if v >= 0 else '-'}${abs(v):,.2f}"
+
+
+def daily_pnl(s):
+    """Money made or lost each trading day, counting trades closed (sold) that day.
+    Newest first: [{"day": "2026-11-06", "pnl": -12.3, "sells": 7, "wins": 1}, ...]"""
+    days = {}
+    for t in s["trades"]:
+        if "pnl" in t:
+            d = days.setdefault(t["time"][:10], {"day": t["time"][:10], "pnl": 0.0, "sells": 0, "wins": 0})
+            d["pnl"] += t["pnl"]; d["sells"] += 1; d["wins"] += t["pnl"] > 0
+    return sorted(days.values(), key=lambda d: d["day"], reverse=True)
+
+
+def day_summary(days):
+    green = [d for d in days if d["pnl"] > 0]
+    red = [d for d in days if d["pnl"] < 0]
+    return green, red
+
+
+def daily_panel(s):
+    """Right-hand panel: green vs red days and a bar per day."""
+    days = daily_pnl(s)
+    green, red = day_summary(days)
+    biggest = max((abs(d["pnl"]) for d in days), default=0) or 1
+    rows = "".join(
+        f"<div class=d><span>{datetime.date.fromisoformat(d['day']):%a %b %-d}</span>"
+        f"<span class=bar><i class={'g' if d['pnl'] >= 0 else 'r'} style='width:{max(4, abs(d['pnl']) / biggest * 100):.0f}%'></i></span>"
+        f"<b class={'g' if d['pnl'] >= 0 else 'r'}>{money(d['pnl'])}</b>"
+        f"<small>{d['wins']}/{d['sells']} sells won</small></div>"
+        for d in days) or "<p class=n>No closed trades yet.</p>"
+    best = max(days, key=lambda d: d["pnl"], default=None)
+    worst = min(days, key=lambda d: d["pnl"], default=None)
+    extremes = (f"<p class=n>Best day {datetime.date.fromisoformat(best['day']):%b %-d}: {money(best['pnl'])}<br>"
+                f"Worst day {datetime.date.fromisoformat(worst['day']):%b %-d}: {money(worst['pnl'])}</p>") if days else ""
+    open_pl = sum((s["prices"].get(k, p["entry"]) - p["entry"]) * p["qty"] for k, p in s["pos"].items())
+    open_note = f"<p class=n>Not yet counted: {money(open_pl)} on open positions (counts on the day they're sold).</p>" if s["pos"] else ""
+    return f"""<aside><h3>Daily results</h3>
+<div class=k2><div class='c g'>Profitable days<b>{len(green)}</b></div><div class='c r'>Negative days<b>{len(red)}</b></div></div>
+{extremes}{rows}{open_note}
+<p class=n>Each day = money made or lost on trades closed that day.</p></aside>"""
+
+
 def page(s):
     eq = equity(s)
     ret = (eq / START_CASH - 1) * 100
@@ -192,11 +236,20 @@ def page(s):
     status = "OPEN, trading every 5 min" if market_open(now()) else "CLOSED, resumes next trading day 9:30 AM ET"
     return f"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content=30>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Peak Paper Bot</title>
-<style>body{{font:15px -apple-system,sans-serif;max-width:900px;margin:20px auto;padding:0 14px;color:#111}}
+<style>body{{font:15px -apple-system,sans-serif;max-width:1240px;margin:20px auto;padding:0 16px;color:#111}}
+.wrap{{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}}
+@media (max-width:860px){{.wrap{{grid-template-columns:1fr}}}}
+aside{{border:1px solid #ddd;border-radius:12px;padding:4px 16px 12px;position:sticky;top:12px}}
+.k2{{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}}.k2 .c{{min-width:0}}
+.c.g b,b.g{{color:#16a34a}}.c.r b,b.r{{color:#dc2626}}
+.d{{display:grid;grid-template-columns:82px 1fr auto;gap:2px 8px;align-items:center;padding:7px 0;border-bottom:1px solid #eee;font-size:14px}}
+.d small{{grid-column:1/-1;color:#666;font-size:12px}}.bar{{height:10px;background:#f3f3f3;border-radius:5px;overflow:hidden}}
+.bar i{{display:block;height:100%;border-radius:5px}}.bar i.g{{background:#16a34a}}.bar i.r{{background:#dc2626}}
 .k{{display:flex;gap:12px;flex-wrap:wrap}}.c{{border:1px solid #ddd;border-radius:10px;padding:10px 14px;min-width:150px}}
 .c b{{font-size:22px;display:block}}table{{border-collapse:collapse;width:100%;margin:8px 0 20px}}
 td,th{{border-bottom:1px solid #eee;padding:6px;text-align:left;font-size:14px}}.n{{color:#666;font-size:13px}}</style></head><body>
 <h2>Peak Paper Bot <span class=n>(FAKE money, real prices)</span></h2>
+<div class=wrap><main>
 <p class=n>Market: {status} · last check {(s['last_run'] or 'never')[11:16]} ET · page refreshes every 30s</p>
 <div class=k><div class=c>Account value<b>${eq:,.2f}</b></div>
 <div class=c>Bot return<b style='color:{col(ret)}'>{ret:+.2f}%</b></div>
@@ -206,6 +259,7 @@ td,th{{border-bottom:1px solid #eee;padding:6px;text-align:left;font-size:14px}}
 <h3>Open positions</h3><table><tr><th>Stock</th><th>Shares</th><th>Bought at</th><th>Now</th><th>P/L</th></tr>{rows_pos}</table>
 <h3>Trades (newest first)</h3><table><tr><th>Time</th><th>Side</th><th>Stock</th><th>Price</th><th>P/L</th><th>Why</th></tr>{rows_tr}</table>
 <p class=n>Rules: buy when the 9-bar average is at least 0.1% above the 21-bar average (5-min bars); sell when it is 0.1% below, or at -2% stop loss. $1,400 per trade. Started {s['started'][:16].replace('T',' ')}.</p>
+</main>{daily_panel(s)}</div>
 </body></html>"""
 
 
@@ -249,7 +303,18 @@ def results_md(s):
            f"_Last check: {(s['last_run'] or 'never')[:16].replace('T', ' ')} ET. Runs every 5 min, 9:30-4:00 ET on trading days._", "",
            "| Account value | Bot return | If you'd just held SPY | Cash |", "|---|---|---|---|",
            f"| **${eq:,.2f}** | **{ret:+.2f}%** | {spy_ret:+.2f}% | ${s['cash']:,.2f} |", "",
-           f"_{scorecard(s)}_", "",
+           f"_{scorecard(s)}_", ""]
+    days = daily_pnl(s)
+    green, red = day_summary(days)
+    out += ["## Daily results", "", f"**{len(green)} profitable day{'s' if len(green) != 1 else ''}, "
+            f"{len(red)} negative day{'s' if len(red) != 1 else ''}.** Each day = money made or lost on trades closed that day.", "",
+            "| Day | Result | P/L | Winning sells |", "|---|---|---|---|"]
+    for d in days:
+        out.append(f"| {datetime.date.fromisoformat(d['day']):%a %b %-d} | {'🟢 up' if d['pnl'] > 0 else '🔴 down' if d['pnl'] < 0 else '⚪ flat'} "
+                   f"| {money(d['pnl'])} | {d['wins']}/{d['sells']} |")
+    if not days:
+        out.append("| none yet | | | |")
+    out += ["",
            "## Open positions", "", "| Stock | Shares | Bought at | Now | P/L |", "|---|---|---|---|---|"]
     for k, p in s["pos"].items():
         now_p = s["prices"].get(k, p["entry"])
