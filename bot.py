@@ -2,10 +2,13 @@
 
 Strategy (simple trend-following on 5-minute bars):
   - Fast average = last 9 bars, slow average = last 21 bars.
-  - BUY  when fast > slow (price trending up) and we don't hold it.
-  - SELL when fast < slow (trend turned down) or price drops 2% below entry (stop loss).
+  - BUY  when fast is above slow by at least 0.1% (a clear uptrend) and we don't hold it.
+  - SELL when fast is below slow by at least 0.1% (trend turned down) or price drops 2% below entry (stop loss).
+    The 0.1% gap stops it from buying and selling on tiny wiggles (lots of small losses).
+  - Symbols mix stocks with gold, bonds and energy so they don't all move together.
   - Each buy uses $1,400 of the $10,000 fake account. Small slippage is charged.
-Runs every 5 min during market hours (9:30-4:00 ET, weekdays).
+Runs every 5 min during market hours (9:30-4:00 ET, weekdays, NYSE holidays skipped, 1:00 PM on early-close days):
+locally via loop(), on GitHub via --loop.
 Results page: http://localhost:8790
 """
 import json, time, threading, subprocess, datetime, html, os, base64, secrets
@@ -15,8 +18,20 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, "state.json")
-SYMBOLS = ["SPY", "QQQ", "AAPL", "NVDA", "MSFT", "TSLA", "AMZN"]
+# SPY = S&P 500, GLD = gold, TLT = long-term US bonds, XLE = energy stocks. Dropped QQQ/MSFT/AMZN,
+# which moved almost exactly with SPY/AAPL/NVDA and turned every signal into one big bet.
+SYMBOLS = ["SPY", "AAPL", "NVDA", "TSLA", "GLD", "TLT", "XLE"]
 START_CASH, SIZE, FAST, SLOW, STOP, SLIP = 10000.0, 1400.0, 9, 21, 0.02, 0.0002
+GAP = 0.001  # fast must clear slow by 0.1% to count as a trend
+MIN_DAYS = 20  # trading days before the results mean much
+
+# NYSE full-day closures and 1:00 PM early closes (nyse.com holiday calendar). Add each new year here.
+HOLIDAYS = {
+    "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18",
+    "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+}
+EARLY_CLOSE = {"2026-11-27", "2026-12-24", "2027-11-26"}
 lock = threading.Lock()
 
 
@@ -43,8 +58,54 @@ def now():
     return datetime.datetime.now(ET)
 
 
+def trading_day(t):
+    return t.weekday() < 5 and t.strftime("%Y-%m-%d") not in HOLIDAYS
+
+
+def close_time(t):
+    return datetime.time(13, 0) if t.strftime("%Y-%m-%d") in EARLY_CLOSE else datetime.time(16, 0)
+
+
 def market_open(t):
-    return t.weekday() < 5 and datetime.time(9, 30) <= t.time() < datetime.time(16, 0)
+    return trading_day(t) and datetime.time(9, 30) <= t.time() < close_time(t)
+
+
+def check_spy_start(s):
+    """One-time check of the SPY starting price against Yahoo's own 5-min history at the bot's start time.
+    The first price was saved from a single live quote; if it's off by more than 0.5%, use the history."""
+    if s.get("spy_start_checked") or not s.get("spy_start"):
+        return
+    start = datetime.datetime.fromisoformat(s["started"]).timestamp()
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=5m&range=1mo"
+    try:
+        raw = subprocess.run(["curl", "-sf", "--max-time", "15", "-A", "Mozilla/5.0", url],
+                             capture_output=True, check=True).stdout
+        d = json.loads(raw)["chart"]["result"][0]
+        pts = [(ts, c) for ts, c in zip(d["timestamp"], d["indicators"]["quote"][0]["close"]) if c is not None]
+        ts, real = min(pts, key=lambda p: abs(p[0] - start))
+    except Exception as e:
+        s["log"].append(f"SPY start check failed: {e}")
+        return
+    if abs(ts - start) > 900:  # no bar within 15 min of the start: can't judge
+        s["log"].append("SPY start check: no price near start time")
+    elif abs(real / s["spy_start"] - 1) > 0.005:
+        s["log"].append(f"SPY start fixed: saved {s['spy_start']:.2f}, history says {real:.2f}")
+        s["spy_start"] = real
+    else:
+        s["log"].append(f"SPY start confirmed: {s['spy_start']:.2f} (history {real:.2f})")
+    s["spy_start_checked"] = True
+
+
+def scorecard(s):
+    """Honest context for the headline numbers: how long it has run and how closed trades did."""
+    days = len({t["time"][:10] for t in s["trades"]} | ({s["last_run"][:10]} if s["last_run"] else set()))
+    sells = [t for t in s["trades"] if "pnl" in t]
+    wins = sum(t["pnl"] > 0 for t in sells)
+    win = f"{wins}/{len(sells)} closed trades made money" if sells else "no closed trades yet"
+    early = (f"Too early to judge: {days} trading day{'s' if days != 1 else ''} so far, need about {MIN_DAYS}. "
+             f"Short stretches are mostly luck (e.g. sitting in cash on a day SPY happened to drop).") \
+        if days < MIN_DAYS else f"{days} trading days so far."
+    return f"{early} {win}."
 
 
 def bars(sym):
@@ -83,7 +144,7 @@ def tick(s):
         fast = sum(closes[-FAST:]) / FAST
         slow = sum(closes[-SLOW:]) / SLOW
         held = s["pos"].get(sym)
-        if held is None and fast > slow and s["cash"] >= SIZE:
+        if held is None and fast > slow * (1 + GAP) and s["cash"] >= SIZE:
             fill = price * (1 + SLIP)
             qty = round(SIZE / fill, 4)
             s["cash"] -= qty * fill
@@ -94,7 +155,7 @@ def tick(s):
             why = None
             if price <= held["entry"] * (1 - STOP):
                 why = f"stop loss: fell 2% below entry {held['entry']:.2f}"
-            elif fast < slow:
+            elif fast < slow * (1 - GAP):
                 why = f"trend down: 9-bar avg {fast:.2f} < 21-bar avg {slow:.2f}"
             if why:
                 fill = price * (1 - SLIP)
@@ -103,6 +164,7 @@ def tick(s):
                 del s["pos"][sym]
                 s["trades"].append({"time": t.isoformat(), "side": "SELL", "sym": sym, "qty": held["qty"],
                                     "price": fill, "pnl": pnl, "why": why})
+    check_spy_start(s)
     s["last_run"] = t.isoformat()
     s["log"] = s["log"][-20:]
 
@@ -127,7 +189,7 @@ def page(s):
         f"<td>${t['price']:.2f}</td><td style='color:{col(t.get('pnl', 0))}'>"
         f"{'$%+.2f' % t['pnl'] if 'pnl' in t else ''}</td><td>{html.escape(t['why'])}</td></tr>"
         for t in reversed(s["trades"][-40:])) or "<tr><td colspan=6>No trades yet</td></tr>"
-    status = "OPEN, trading every 5 min" if market_open(now()) else "CLOSED, resumes 9:30 AM ET"
+    status = "OPEN, trading every 5 min" if market_open(now()) else "CLOSED, resumes next trading day 9:30 AM ET"
     return f"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content=30>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Peak Paper Bot</title>
 <style>body{{font:15px -apple-system,sans-serif;max-width:900px;margin:20px auto;padding:0 14px;color:#111}}
@@ -140,9 +202,10 @@ td,th{{border-bottom:1px solid #eee;padding:6px;text-align:left;font-size:14px}}
 <div class=c>Bot return<b style='color:{col(ret)}'>{ret:+.2f}%</b></div>
 <div class=c>If you'd just held SPY<b style='color:{col(spy_ret)}'>{spy_ret:+.2f}%</b></div>
 <div class=c>Cash<b>${s['cash']:,.2f}</b></div></div>
+<p class=n>{html.escape(scorecard(s))}</p>
 <h3>Open positions</h3><table><tr><th>Stock</th><th>Shares</th><th>Bought at</th><th>Now</th><th>P/L</th></tr>{rows_pos}</table>
 <h3>Trades (newest first)</h3><table><tr><th>Time</th><th>Side</th><th>Stock</th><th>Price</th><th>P/L</th><th>Why</th></tr>{rows_tr}</table>
-<p class=n>Rules: buy when the 9-bar average is above the 21-bar average (5-min bars); sell when it drops below, or at -2% stop loss. $1,400 per trade. Started {s['started'][:16].replace('T',' ')}.</p>
+<p class=n>Rules: buy when the 9-bar average is at least 0.1% above the 21-bar average (5-min bars); sell when it is 0.1% below, or at -2% stop loss. $1,400 per trade. Started {s['started'][:16].replace('T',' ')}.</p>
 </body></html>"""
 
 
@@ -183,9 +246,10 @@ def results_md(s):
     spy = s["prices"].get("SPY")
     spy_ret = ((spy / s["spy_start"] - 1) * 100) if spy and s["spy_start"] else 0
     out = [f"# Peak Paper Bot (FAKE money, real prices)", "",
-           f"_Last check: {(s['last_run'] or 'never')[:16].replace('T', ' ')} ET. Runs every 5 min, 9:30-4:00 ET weekdays._", "",
+           f"_Last check: {(s['last_run'] or 'never')[:16].replace('T', ' ')} ET. Runs every 5 min, 9:30-4:00 ET on trading days._", "",
            "| Account value | Bot return | If you'd just held SPY | Cash |", "|---|---|---|---|",
            f"| **${eq:,.2f}** | **{ret:+.2f}%** | {spy_ret:+.2f}% | ${s['cash']:,.2f} |", "",
+           f"_{scorecard(s)}_", "",
            "## Open positions", "", "| Stock | Shares | Bought at | Now | P/L |", "|---|---|---|---|---|"]
     for k, p in s["pos"].items():
         now_p = s["prices"].get(k, p["entry"])
@@ -196,14 +260,57 @@ def results_md(s):
     for t in reversed(s["trades"][-60:]):
         pnl = "$%+.2f" % t["pnl"] if "pnl" in t else ""
         out.append(f"| {t['time'][5:16].replace('T', ' ')} | {t['side']} | {t['sym']} | ${t['price']:.2f} | {pnl} | {t['why']} |")
-    out += ["", f"Rules: buy when the 9-bar average is above the 21-bar average (5-min bars); sell when it drops below, "
-            f"or at a -2% stop loss. $1,400 per trade. Started {s['started'][:16].replace('T', ' ')}."]
+    out += ["", f"Rules: buy when the 9-bar average is at least 0.1% above the 21-bar average (5-min bars); "
+            f"sell when it is 0.1% below, or at a -2% stop loss. $1,400 per trade. Started {s['started'][:16].replace('T', ' ')}."]
     return "\n".join(out) + "\n"
+
+
+def git_save(msg):
+    """Commit state.json + RESULTS.md and push. Pulls first so other people's commits are kept."""
+    run = lambda *c: subprocess.run(["git", *c], cwd=HERE)
+    run("add", "state.json", "RESULTS.md")
+    if run("diff", "--cached", "--quiet").returncode == 0:
+        return
+    run("commit", "-q", "-m", msg)
+    for wait in (0, 2, 4, 8, 16):
+        time.sleep(wait)
+        if run("pull", "-q", "--rebase").returncode == 0 and run("push", "-q").returncode == 0:
+            return
+        run("rebase", "--abort")
+    print("push failed, will retry next tick", flush=True)
+
+
+def cloud_loop(max_minutes):
+    """One long GitHub Actions job: tick every 5 min until market close or until the job's time is up.
+    GitHub's own schedule is too unreliable for 5-min runs, so the timing lives here instead."""
+    started = time.time()
+    deadline = started + max_minutes * 60
+    t = now()
+    open_at = t.replace(hour=9, minute=30, second=5, microsecond=0)
+    if trading_day(t) and t < open_at:  # started early: wait for the bell
+        wait = (open_at - t).total_seconds()
+        if time.time() + wait > deadline:
+            print("too early to wait for the open, exiting"); return
+        print(f"waiting {wait / 60:.0f} min for market open", flush=True)
+        time.sleep(wait)
+    while time.time() < deadline and market_open(now()):
+        s = load()
+        tick(s); save(s)
+        open(os.path.join(HERE, "RESULTS.md"), "w").write(results_md(s))
+        print("ticked", now().isoformat(), flush=True)
+        git_save(f"tick {datetime.datetime.utcnow():%H:%M}")
+        # sleep to the next 5-minute mark (9:35, 9:40, ...)
+        t = now()
+        nxt = (t + datetime.timedelta(minutes=5 - t.minute % 5)).replace(second=5, microsecond=0)
+        time.sleep(max(1, (nxt - t).total_seconds()))
+    print("done:", "market closed" if not market_open(now()) else "job time limit, next run takes over")
 
 
 if __name__ == "__main__":
     import sys
-    if "--check" in sys.argv:  # cloud smoke test: fetch prices only, no trades
+    if "--loop" in sys.argv:  # GitHub Actions: one job runs all trading day
+        cloud_loop(int(os.environ.get("LOOP_MINUTES", "340")))
+    elif "--check" in sys.argv:  # cloud smoke test: fetch prices only, no trades
         for sym in SYMBOLS:
             closes, price = bars(sym)
             print(sym, price, len(closes), "bars")
