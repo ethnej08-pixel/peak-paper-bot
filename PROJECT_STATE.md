@@ -13,8 +13,8 @@
 
 - **Overall:** In progress — bot is live on GitHub Actions and trading fake money.
 - **Current goal:** Run the 9/21-bar trend strategy on 7 symbols and compare against holding SPY.
-- **Next action:** Decide whether hourly checks are OK or the bot needs a more reliable 5-minute scheduler (see blockers).
-- **Blockers / decisions needed:** The workflow asks for a run every 5 min, but GitHub only ran it about once an hour (git log: 15:09, 15:43, 16:32, 17:27 … UTC on 2026-11-06). GitHub delays scheduled workflows under load, so the bot sees ~7 checks a day, not ~78.
+- **Next action:** Merge branch `claude/elegant-wright-vtc4sp` into `main` and make the repo public, so the new all-day 5-minute loop starts.
+- **Blockers / decisions needed:** GitHub's cron only fired about hourly. Fix (on the branch): one long job per trading day ticks every 5 min itself (`bot.py --loop`). Needs a public repo for free unlimited Actions minutes; owner chose public on 2026-11-07.
 
 ## Tasks
 
@@ -23,8 +23,8 @@
 | Done | Paper-trading bot (`bot.py`) | Claude | commit `44c63bb` | 2026-11-05 |
 | Done | Scheduled GitHub Actions run (`.github/workflows/trade.yml`) | Claude | `tick HH:MM` commits on 2026-11-05 and 2026-11-06 | 2026-11-06 |
 | Done | Shared project state template | ethnej08-pixel | commit `25e21b7` | 2026-11-06 |
-| Todo | Decide on schedule reliability (hourly vs true 5-min) | ethnej08-pixel |  |  |
-| Todo | Update cron times when DST starts in March (shift back 1 hour) | ethnej08-pixel | comment in `trade.yml` |  |
+| Done | True 5-min schedule via all-day loop job | Claude Code | `bot.py --loop`, `.github/workflows/trade.yml` on branch `claude/elegant-wright-vtc4sp` | 2026-11-07 |
+| Todo | Make repo public + merge branch to `main` | ethnej08-pixel |  |  |
 
 ## Work log
 
@@ -32,11 +32,11 @@ Add newest entries first. Keep each entry short and verifiable.
 
 ### 2026-11-07 — Claude Code
 
-- **Completed:** Filled in this file from the repo's current state.
-- **Files changed:** `PROJECT_STATE.md` — status, tasks, work log, automations.
-- **Checks run:** Read `state.json` and `RESULTS.md`: 42 trades since 2026-11-04 15:23 ET; account $10,002.15 (+0.02%) vs SPY -4.25%; no open positions; last check 2026-11-06 15:57 ET. Read `git log` for run times. Bot code not run.
+- **Completed:** Filled in this file from the repo's current state. Switched the bot to an all-day loop job so it really runs every 5 min.
+- **Files changed:** `PROJECT_STATE.md` — status, tasks, log; `bot.py` — `--loop` mode + `git_save`; `.github/workflows/trade.yml` — kick-off crons, 6 h job, no DST edits needed.
+- **Checks run:** Read `state.json` and `RESULTS.md`: 42 trades since 2026-11-04 15:23 ET; account $10,002.15 (+0.02%) vs SPY -4.25%; no open positions; last check 2026-11-06 15:57 ET. Read `git log` for run times. Simulated `cloud_loop` with a fake clock: 52 ticks 9:30–13:45, then a takeover run 13:47–15:55, stopped at close. Not yet run on GitHub.
 - **Still working on:** Nothing.
-- **Next step:** Owner decides on the schedule question above.
+- **Next step:** Owner makes repo public and merges to `main`; check Actions on Monday.
 
 ### 2026-11-06 20:02 EST — Peak (Claude)
 
@@ -58,7 +58,7 @@ Add newest entries first. Keep each entry short and verifiable.
 
 | Item | Status | Evidence (file, link, run ID, or result) | Last checked |
 |---|---|---|---|
-| `paper-trade` workflow (scheduled, weekdays 9:30–3:55 ET) | Running, but about hourly instead of every 5 min | `tick` commits in `git log`; output in `RESULTS.md` | 2026-11-07 |
+| `paper-trade` workflow (weekdays 9:30–3:55 ET) | On `main`: about hourly. On branch: every 5 min via loop (simulated full day = 79 ticks; not yet run on GitHub) | `tick` commits in `git log`; output in `RESULTS.md` | 2026-11-07 |
 | Manual price check (`workflow_dispatch`, `bot.py --check`) | Available | `.github/workflows/trade.yml` | 2026-11-07 |
 
 ## Review notes

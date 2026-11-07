@@ -5,7 +5,7 @@ Strategy (simple trend-following on 5-minute bars):
   - BUY  when fast > slow (price trending up) and we don't hold it.
   - SELL when fast < slow (trend turned down) or price drops 2% below entry (stop loss).
   - Each buy uses $1,400 of the $10,000 fake account. Small slippage is charged.
-Runs every 5 min during market hours (9:30-4:00 ET, weekdays).
+Runs every 5 min during market hours (9:30-4:00 ET, weekdays): locally via loop(), on GitHub via --loop.
 Results page: http://localhost:8790
 """
 import json, time, threading, subprocess, datetime, html, os
@@ -174,9 +174,52 @@ def results_md(s):
     return "\n".join(out) + "\n"
 
 
+def git_save(msg):
+    """Commit state.json + RESULTS.md and push. Pulls first so other people's commits are kept."""
+    run = lambda *c: subprocess.run(["git", *c], cwd=HERE)
+    run("add", "state.json", "RESULTS.md")
+    if run("diff", "--cached", "--quiet").returncode == 0:
+        return
+    run("commit", "-q", "-m", msg)
+    for wait in (0, 2, 4, 8, 16):
+        time.sleep(wait)
+        if run("pull", "-q", "--rebase").returncode == 0 and run("push", "-q").returncode == 0:
+            return
+        run("rebase", "--abort")
+    print("push failed, will retry next tick", flush=True)
+
+
+def cloud_loop(max_minutes):
+    """One long GitHub Actions job: tick every 5 min until market close or until the job's time is up.
+    GitHub's own schedule is too unreliable for 5-min runs, so the timing lives here instead."""
+    started = time.time()
+    deadline = started + max_minutes * 60
+    t = now()
+    open_at = t.replace(hour=9, minute=30, second=5, microsecond=0)
+    if t.weekday() < 5 and t < open_at:  # started early: wait for the bell
+        wait = (open_at - t).total_seconds()
+        if time.time() + wait > deadline:
+            print("too early to wait for the open, exiting"); return
+        print(f"waiting {wait / 60:.0f} min for market open", flush=True)
+        time.sleep(wait)
+    while time.time() < deadline and market_open(now()):
+        s = load()
+        tick(s); save(s)
+        open(os.path.join(HERE, "RESULTS.md"), "w").write(results_md(s))
+        print("ticked", now().isoformat(), flush=True)
+        git_save(f"tick {datetime.datetime.utcnow():%H:%M}")
+        # sleep to the next 5-minute mark (9:35, 9:40, ...)
+        t = now()
+        nxt = (t + datetime.timedelta(minutes=5 - t.minute % 5)).replace(second=5, microsecond=0)
+        time.sleep(max(1, (nxt - t).total_seconds()))
+    print("done:", "market closed" if not market_open(now()) else "job time limit, next run takes over")
+
+
 if __name__ == "__main__":
     import sys
-    if "--check" in sys.argv:  # cloud smoke test: fetch prices only, no trades
+    if "--loop" in sys.argv:  # GitHub Actions: one job runs all trading day
+        cloud_loop(int(os.environ.get("LOOP_MINUTES", "340")))
+    elif "--check" in sys.argv:  # cloud smoke test: fetch prices only, no trades
         for sym in SYMBOLS:
             closes, price = bars(sym)
             print(sym, price, len(closes), "bars")
