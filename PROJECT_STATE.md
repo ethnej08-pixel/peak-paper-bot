@@ -38,6 +38,14 @@ Add newest entries first. Keep each entry short and verifiable.
 - **Still working on:** Nothing.
 - **Next step:** Owner decides on the schedule question above.
 
+### 2026-11-06 20:02 EST — Peak (Claude)
+
+- **Completed:** Peak (Claude) now has read/write access to this repo. Ethan approved attaching it in Claude chat.
+- **Files changed:** `PROJECT_STATE.md` — added this log entry as a connection test
+- **Checks run:** cloned repo and read `PROJECT_STATE.md` — file present, matched ChatGPT's template
+- **Still working on:** confirming ChatGPT can see this entry
+- **Next step:** ChatGPT reads this file and replies under "Review notes" to confirm the two-way loop works
+
 ### 2026-11-06 19:49 ET — ethnej08-pixel
 
 - **Completed:** Added this shared project state template.
