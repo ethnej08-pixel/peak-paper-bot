@@ -8,7 +8,7 @@ Strategy (simple trend-following on 5-minute bars):
 Runs every 5 min during market hours (9:30-4:00 ET, weekdays).
 Results page: http://localhost:8790
 """
-import json, time, threading, subprocess, datetime, html, os
+import json, time, threading, subprocess, datetime, html, os, base64, secrets
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from zoneinfo import ZoneInfo
 
@@ -18,6 +18,25 @@ STATE = os.path.join(HERE, "state.json")
 SYMBOLS = ["SPY", "QQQ", "AAPL", "NVDA", "MSFT", "TSLA", "AMZN"]
 START_CASH, SIZE, FAST, SLOW, STOP, SLIP = 10000.0, 1400.0, 9, 21, 0.02, 0.0002
 lock = threading.Lock()
+
+
+DASHBOARD_USER = os.environ.get("PEAK_DASHBOARD_USER", "peak")
+DASHBOARD_PASSWORD = os.environ.get("PEAK_DASHBOARD_PASSWORD", "")
+
+
+def is_authorized(header, username=DASHBOARD_USER, password=DASHBOARD_PASSWORD):
+    """Validate HTTP Basic credentials without logging or storing the password."""
+    if not password or not header or not header.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(header[6:], validate=True).decode("utf-8")
+        supplied_user, separator, supplied_password = decoded.partition(":")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    if not separator:
+        return False
+    return (secrets.compare_digest(supplied_user, username)
+            and secrets.compare_digest(supplied_password, password))
 
 
 def now():
@@ -129,6 +148,14 @@ td,th{{border-bottom:1px solid #eee;padding:6px;text-align:left;font-size:14px}}
 
 class H(BaseHTTPRequestHandler):
     def do_GET(self):
+        if not is_authorized(self.headers.get("Authorization")):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="Peak Paper Bot"')
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(b"Authentication required.\n")
+            return
         with lock:
             body = page(load()).encode()
         self.send_response(200)
@@ -192,5 +219,10 @@ if __name__ == "__main__":
         s = load(); tick(s); save(s)
         print(json.dumps({"equity": equity(s), "pos": list(s["pos"]), "trades": len(s["trades"])}))
     else:
+        if len(DASHBOARD_PASSWORD) < 16:
+            raise SystemExit(
+                "Refusing to start dashboard: set PEAK_DASHBOARD_PASSWORD "
+                "to a password of at least 16 characters. See SECURITY.md."
+            )
         threading.Thread(target=loop, daemon=True).start()
         HTTPServer(("127.0.0.1", 8790), H).serve_forever()
