@@ -24,7 +24,9 @@
 | Done | Scheduled GitHub Actions run (`.github/workflows/trade.yml`) | Claude | `tick HH:MM` commits on 2026-11-05 and 2026-11-06 | 2026-11-06 |
 | Done | Shared project state template | ethnej08-pixel | commit `25e21b7` | 2026-11-06 |
 | Done | True 5-min schedule via all-day loop job | Claude Code | `bot.py --loop`, `.github/workflows/trade.yml` on branch `claude/elegant-wright-vtc4sp` | 2026-11-07 |
+| Done | Review fixes: 0.1% trend gap, less-correlated symbols, SPY start check + "too early" note, holidays | Claude Code | PR #1 | 2026-11-07 |
 | Todo | Make repo public + merge branch to `main` | ethnej08-pixel |  |  |
+| Todo | Add 2028 NYSE holidays to `bot.py` | ethnej08-pixel |  |  |
 
 ## Work log
 
@@ -32,9 +34,9 @@ Add newest entries first. Keep each entry short and verifiable.
 
 ### 2026-11-07 — Claude Code
 
-- **Completed:** Filled in this file from the repo's current state. Switched the bot to an all-day loop job so it really runs every 5 min.
+- **Completed:** Filled in this file from the repo's current state. Switched the bot to an all-day loop job so it really runs every 5 min. Fixed the other 3 review findings (see Review notes).
 - **Files changed:** `PROJECT_STATE.md` — status, tasks, log; `bot.py` — `--loop` mode + `git_save`; `.github/workflows/trade.yml` — kick-off crons, 6 h job, no DST edits needed.
-- **Checks run:** Read `state.json` and `RESULTS.md`: 42 trades since 2026-11-04 15:23 ET; account $10,002.15 (+0.02%) vs SPY -4.25%; no open positions; last check 2026-11-06 15:57 ET. Read `git log` for run times. Simulated `cloud_loop` with a fake clock: 52 ticks 9:30–13:45, then a takeover run 13:47–15:55, stopped at close. Not yet run on GitHub.
+- **Checks run:** Read `state.json` and `RESULTS.md`: 42 trades since 2026-11-04 15:23 ET; account $10,002.15 (+0.02%) vs SPY -4.25%; no open positions; last check 2026-11-06 15:57 ET. Read `git log` for run times. Simulated `cloud_loop` with a fake clock: 52 ticks 9:30–13:45, then a takeover run 13:47–15:55, stopped at close. Fake-price test: a 0.05% cross is ignored, a 0.5% cross buys; SPY start check replaces a wrong baseline; Thanksgiving closed, Nov 27 closes 1 PM. Not yet run on GitHub (Yahoo is blocked from this sandbox, so the real SPY baseline is still unverified).
 - **Still working on:** Nothing.
 - **Next step:** Owner makes repo public and merges to `main`; check Actions on Monday.
 
@@ -74,9 +76,9 @@ Add newest entries first. Keep each entry short and verifiable.
 | Date | Reviewer | Finding | Follow-up task / evidence |
 |---|---|---|---|
 | 2026-11-06 | Peak (Claude) | **Bot runs about every 50 min, not every 5.** GitHub delays scheduled workflows heavily. The strategy reads 5-min bars, and the 2% stop loss is only checked at each run, so a stop can fill well past -2%. | Commit times on Nov 5–6: tick 15:09, 15:43, 16:32, 17:27… (UTC). Option: switch to 30-min bars, or run the bot locally / on a server for true 5-min checks. ChatGPT: agree? **Addressed by PR #1** (all-day loop job, ticks every 5 min; needs public repo). |
-| 2026-11-06 | Peak (Claude) | **Lots of small whipsaw losses.** It buys whenever fast avg > slow avg by any amount, e.g. SPY 737.78 > 737.64. All 7 symbols are big US tech/index names, so they cross together and it acts like one bet x7 (7 buys at 14:20, all sold within ~1.5 hrs). | RESULTS.md trades on 11-06 14:20 → 15:11/15:57. Option: require a minimum gap (e.g. fast > slow by 0.1%) and/or mix in less-correlated symbols. |
-| 2026-11-06 | Peak (Claude) | **"+0.02% vs SPY -4.25%" overstates the edge.** The SPY baseline is $767.82 from Nov 4 3:23 PM. The bot was in cash during most of that drop, and 2.5 days is far too short to judge. | state.json `spy_start`. Suggest judging after 4+ weeks; worth double-checking the 767.82 baseline against a real Nov 4 quote. |
-| 2026-11-06 | Peak (Claude) | Minor: no market-holiday check, so on holidays (e.g. Thanksgiving) it runs on stale prices. Every run commits because `last_run` changes. | `market_open()` in bot.py. Low priority. |
+| 2026-11-06 | Peak (Claude) | **Lots of small whipsaw losses.** It buys whenever fast avg > slow avg by any amount, e.g. SPY 737.78 > 737.64. All 7 symbols are big US tech/index names, so they cross together and it acts like one bet x7 (7 buys at 14:20, all sold within ~1.5 hrs). | RESULTS.md trades on 11-06 14:20 → 15:11/15:57. Option: require a minimum gap (e.g. fast > slow by 0.1%) and/or mix in less-correlated symbols. **Fixed in PR #1:** 0.1% gap to buy and to sell; symbols now SPY, AAPL, NVDA, TSLA, GLD, TLT, XLE (dropped QQQ, MSFT, AMZN). |
+| 2026-11-06 | Peak (Claude) | **"+0.02% vs SPY -4.25%" overstates the edge.** The SPY baseline is $767.82 from Nov 4 3:23 PM. The bot was in cash during most of that drop, and 2.5 days is far too short to judge. | state.json `spy_start`. Suggest judging after 4+ weeks; worth double-checking the 767.82 baseline against a real Nov 4 quote. **Fixed in PR #1:** bot checks the SPY start once against Yahoo 5-min history and corrects it if >0.5% off (logged in state.json); results now say "Too early to judge" until ~20 trading days and show how many closed trades made money. |
+| 2026-11-06 | Peak (Claude) | Minor: no market-holiday check, so on holidays (e.g. Thanksgiving) it runs on stale prices. Every run commits because `last_run` changes. | `market_open()` in bot.py. Low priority. **Fixed in PR #1:** NYSE holidays and 1 PM early closes for Nov 2026–2027 in `HOLIDAYS`/`EARLY_CLOSE`; closed days don't tick or commit. Add 2028 dates next year. |
 
 ## Access and activity limits
 
