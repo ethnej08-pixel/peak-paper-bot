@@ -1,16 +1,8 @@
 name: paper-trade
 
-# GitHub's cron is unreliable for every-5-minute jobs (it was firing about hourly).
-# So instead, one long job runs all trading day and ticks every 5 min itself (bot.py --loop).
-# The crons below are just "kick-off" attempts spread over the morning and day:
-#   - whichever fires first starts the loop (it waits for 9:30 ET if early)
-#   - the others queue behind it (concurrency) and take over if a job hits its time limit
-#   - a run that starts after the close exits in seconds
-# Times are UTC and cover both EST and EDT, so no daylight-saving changes are needed.
-# NOTE: needs a PUBLIC repo for unlimited free Actions minutes (~6.5 h/day of runtime).
+# Scheduled runs are paused at the owner's request.
+# Manual dispatch remains available for an explicit price check or paper-trade run.
 on:
-  schedule:
-    - cron: "7,37 12-20 * * 1-5"
   workflow_dispatch:
     inputs:
       check:
